@@ -859,6 +859,28 @@ static int cf_contains_locked(CfHandle *h, const void *item, size_t len) {
     return cf_bucket_find(h, i1, fp) >= 0 || cf_bucket_find(h, i2, fp) >= 0;
 }
 
+/* Number of stored fingerprints matching (item,len) across its two candidate
+ * buckets: 0 .. 2*CF_SLOTS. Since add stores a fresh copy each time and a given
+ * fingerprint can only ever live in these two buckets, this is the item's
+ * occurrence count -- how many times it was added minus removed -- capped at the
+ * structural ceiling 2*CF_SLOTS (== 8). Probabilistic like contains(): a distinct
+ * item whose 16-bit fingerprint collides AND maps into a candidate bucket inflates
+ * the result (the remove() caveat). Guards i2 == i1 (a fingerprint can map both
+ * candidates to the same bucket) so those 4 slots are not double-counted. */
+static int cf_count_of_locked(CfHandle *h, const void *item, size_t len) {
+    uint16_t fp;
+    uint64_t i1, i2;
+    cf_hash(h, item, len, &fp, &i1, &i2);
+    int n = 0;
+    uint16_t *b = cf_bucket(h, i1);
+    for (int j = 0; j < CF_SLOTS; j++) if (b[j] == fp) n++;
+    if (i2 != i1) {
+        b = cf_bucket(h, i2);
+        for (int j = 0; j < CF_SLOTS; j++) if (b[j] == fp) n++;
+    }
+    return n;
+}
+
 /* remove ONE matching fingerprint of (item,len): clear the slot, return 1 if
  * found, else 0. Removing an item that was never added (or one whose 16-bit
  * fingerprint collides with a present item) can delete the wrong fingerprint --

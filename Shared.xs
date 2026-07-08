@@ -151,6 +151,22 @@ contains(self, item)
     RETVAL
 
 int
+count_of(self, item)
+    SV *self
+    SV *item
+  PREINIT:
+    EXTRACT(self);
+    STRLEN n;
+    const char *s;
+  CODE:
+    s = SvPVbyte(item, n);                 /* may croak (wide char) -- BEFORE the lock */
+    cf_rwlock_rdlock(h);
+    RETVAL = cf_count_of_locked(h, s, n);
+    cf_rwlock_rdunlock(h);
+  OUTPUT:
+    RETVAL
+
+int
 remove(self, item)
     SV *self
     SV *item
