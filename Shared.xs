@@ -28,6 +28,17 @@
     sv_bless(ref, gv_stashpv(class, GV_ADD)); \
     RETVAL = ref
 
+/* The constructors re-read the class PV from ST(0) immediately before
+ * MAKE_OBJ, at the point of use: xsubpp captured `class` (typemap
+ * `const char *`) in the INPUT section, BEFORE any get-magic on the later
+ * arguments ran (the UV/int conversions of capacity/fd and the explicit
+ * SvGETMAGICs in CODE). That magic is arbitrary Perl and can realloc or free
+ * the class PV, so the INPUT capture may already dangle when gv_stashpv uses
+ * it. SvPV_nolen, not SvPV_nomg: the re-read must dispatch overload
+ * stringification exactly as the original INPUT conversion did. */
+#define REREAD_CLASS() \
+    class = SvPV_nolen(ST(0))
+
 MODULE = Data::CuckooFilter::Shared  PACKAGE = Data::CuckooFilter::Shared
 
 PROTOTYPES: DISABLE
@@ -52,6 +63,7 @@ new(class, path = &PL_sv_undef, capacity = 0, ...)
         croak("Data::CuckooFilter::Shared->new: capacity must be >= 1");
     CfHandle *h = cf_create(p, (uint64_t)capacity, mode, errbuf);
     if (!h) croak("Data::CuckooFilter::Shared->new: %s", errbuf);
+    REREAD_CLASS();   /* after all argument magic: capacity SvUV, mode/path SvGETMAGIC */
     MAKE_OBJ(class, h);
   OUTPUT:
     RETVAL
@@ -69,6 +81,7 @@ new_memfd(class, name = &PL_sv_undef, capacity = 0)
         croak("Data::CuckooFilter::Shared->new_memfd: capacity must be >= 1");
     CfHandle *h = cf_create_memfd(nm, (uint64_t)capacity, errbuf);
     if (!h) croak("Data::CuckooFilter::Shared->new_memfd: %s", errbuf);
+    REREAD_CLASS();   /* after all argument magic: capacity SvUV, name SvGETMAGIC */
     MAKE_OBJ(class, h);
   OUTPUT:
     RETVAL
@@ -82,6 +95,7 @@ new_from_fd(class, fd)
   CODE:
     CfHandle *h = cf_open_fd(fd, errbuf);
     if (!h) croak("Data::CuckooFilter::Shared->new_from_fd: %s", errbuf);
+    REREAD_CLASS();   /* after all argument magic: fd SvIV conversion */
     MAKE_OBJ(class, h);
   OUTPUT:
     RETVAL
