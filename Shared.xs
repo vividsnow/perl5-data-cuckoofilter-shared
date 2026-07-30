@@ -20,6 +20,8 @@
  * explicit DESTROY, so the local `h` would dangle.  Used only where magic
  * can actually intervene between EXTRACT and the first use of h. */
 #define REEXTRACT(sv) \
+    if (!SvROK(sv)) \
+        croak("Data::CuckooFilter::Shared object was replaced during the call"); \
     h = INT2PTR(CfHandle*, SvIV(SvRV(sv))); \
     if (h != h0) croak("Data::CuckooFilter::Shared object replaced or destroyed during the call")
 
