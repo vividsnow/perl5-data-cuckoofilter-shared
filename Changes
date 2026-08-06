@@ -1,5 +1,21 @@
 Revision history for Data-CuckooFilter-Shared
 
+0.04      2026-08-06
+          - xt/valgrind.t: run the real interpreter, not a wrapper script. Under
+            a shim perl (plenv, perlbrew) valgrind traced the shell and never saw
+            the XS, so the test passed regardless of what the module did.
+          - Frozen read-only mode: freeze() seals a file-backed filter;
+            new_readonly() maps it O_RDONLY and queries it lock-free.
+          - Recover a file left behind by an interrupted create instead of
+            leaving the path unopenable.
+          - unlink() reports a removal that failed; one already gone is not.
+          - Re-entrancy hardening for tied and overloaded arguments.
+          - Docs: the seal is honoured by this release and later; an older build
+            does not know the flag and opens a sealed file read-write.
+          - Docs: a rejected add restores the fingerprint table, not the whole
+            file; fd ownership on new_from_fd; sparse-file disk space;
+            crash-safety guidance.
+
 0.03      2026-07-23
           - On-disk format change (v1 -> v2): an existing 0.02 file is
             refused; recreate it.
